@@ -5,6 +5,7 @@ import ImportButton from "@/components/ImportButton";
 import SearchBar from "@/components/SearchBar";
 import SignOutButton from "@/components/SignOutButton";
 import { GROUPS, isGroup, type Group } from "@/lib/identity/groups";
+import { GENERATE_CONTENTS } from "@/lib/identity/contents";
 import "./home.css";
 
 const COLUMNS = "id,slug,name,grp,description,tags,user_id,updated_at";
@@ -67,6 +68,9 @@ export default async function DashboardPage({
     return s ? `/?${s}` : "/";
   };
 
+  // 表示中のフォルダに属するテンプレート（ALL では全テンプレート）。検索中は出さない。
+  const templates = q ? [] : GENERATE_CONTENTS.filter((c) => !group || c.grp === group);
+
   const heading = q
     ? `「${q}」の検索結果${scopeGroup ? `（${scopeGroup}）` : "（全体）"}`
     : (group ?? "ALL");
@@ -89,9 +93,6 @@ export default async function DashboardPage({
               管理 / ADMIN
             </Link>
           )}
-          <Link href="/generate" className="home-btn">
-            テンプレ / TEMPLATE
-          </Link>
           <ImportButton defaultGroup={group} />
           <SignOutButton />
         </div>
@@ -122,6 +123,31 @@ export default async function DashboardPage({
 
         <div className="home-content">
           <SearchBar group={group} q={q} scope={scopeGroup ? "group" : "all"} />
+          {templates.length > 0 && (
+            <section className="home-section">
+              <div className="home-section-head">
+                <div>
+                  <div className="home-eyebrow">TEMPLATE</div>
+                  <h2>テンプレート{group ? `（${group}）` : ""}</h2>
+                </div>
+                <span className="home-count">{templates.length} TEMPLATES</span>
+              </div>
+              <div className="home-grid">
+                {templates.map((c) => (
+                  <Link key={c.slug} href={`/generate/${c.slug}`} className="home-card">
+                    <div>
+                      <div className="home-card-tag">
+                        {c.grp} · {c.no}
+                      </div>
+                      <div className="home-card-title">{c.title}</div>
+                      <p className="home-card-desc">{c.blurb}</p>
+                    </div>
+                    <span className="home-card-cta">新規作成 →</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
           <section className="home-section">
             <div className="home-section-head">
               <div>

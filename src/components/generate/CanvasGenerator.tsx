@@ -14,7 +14,7 @@ import {
 import { saveGenerator } from "@/lib/identity/persist";
 import { sanitizeParams } from "@/lib/identity/sanitize";
 import { cleanTags, downloadJson, toExchangeJson } from "@/lib/identity/exchange";
-import { DEFAULT_GROUP, GROUPS, isGroup, type Group } from "@/lib/identity/groups";
+import { GROUPS, isGroup, type Group } from "@/lib/identity/groups";
 import { downloadSvg } from "@/lib/svg/serialize";
 import "./orbitype.css";
 
@@ -56,9 +56,11 @@ function getIntroSeconds(renderer: CanvasRenderer | null | undefined, params: Pa
 export default function CanvasGenerator({
   slug,
   initial,
+  defaultGroup,
 }: {
   slug: string;
   initial?: GenInitial;
+  defaultGroup: Group; // 新規作成時の保存先（テンプレートの所属フォルダ）
 }) {
   const content = MULTI_CONTENTS[slug];
   if (!content) {
@@ -66,18 +68,26 @@ export default function CanvasGenerator({
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
         <p className="text-sm text-zinc-500">このコンテンツは準備中です。</p>
         <Link
-          href="/generate"
+          href="/"
           className="rounded-md border border-black/15 px-3 py-1.5 text-sm hover:bg-black/[.03] dark:border-white/20 dark:hover:bg-white/[.06]"
         >
-          ← テンプレ一覧へ
+          ← ホームに戻る
         </Link>
       </div>
     );
   }
-  return <CanvasGeneratorInner slug={slug} initial={initial} />;
+  return <CanvasGeneratorInner slug={slug} initial={initial} defaultGroup={defaultGroup} />;
 }
 
-function CanvasGeneratorInner({ slug, initial }: { slug: string; initial?: GenInitial }) {
+function CanvasGeneratorInner({
+  slug,
+  initial,
+  defaultGroup,
+}: {
+  slug: string;
+  initial?: GenInitial;
+  defaultGroup: Group;
+}) {
   const content = MULTI_CONTENTS[slug];
 
   // 保存済みの mode が現存しない（削除されたモード等）場合は先頭モードへ正規化する。
@@ -106,7 +116,7 @@ function CanvasGeneratorInner({ slug, initial }: { slug: string; initial?: GenIn
   const modeParamsRef = useRef<Record<string, Params>>({});
   const [name, setName] = useState(initial?.name ?? content.title);
   const [genId, setGenId] = useState<string | null>(initial?.canEdit ? initial.id : null);
-  const [grp, setGrp] = useState<Group>(initial?.grp ?? DEFAULT_GROUP);
+  const [grp, setGrp] = useState<Group>(initial?.grp ?? defaultGroup);
   const [description, setDescription] = useState(initial?.description ?? "");
   const [tagsText, setTagsText] = useState((initial?.tags ?? []).join(", "));
   const [saving, setSaving] = useState(false);
@@ -389,13 +399,13 @@ function CanvasGeneratorInner({ slug, initial }: { slug: string; initial?: GenIn
       {/* ---------- topbar ---------- */}
       <div className="gen-topbar">
         <div className="gen-nav">
-          <Link href="/generate" className="gen-brand" title="テンプレ一覧へ戻る">
+          <Link href="/" className="gen-brand" title="ホームに戻る">
             <span className="gen-brand-mark">
               <i />
               <i />
               <i />
             </span>
-            TEMPLATE
+            MOFF_ATLUS
           </Link>
           <Link href="/" className="gen-tbtn" title="ホームに戻る">
             <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden>
@@ -408,7 +418,7 @@ function CanvasGeneratorInner({ slug, initial }: { slug: string; initial?: GenIn
                 strokeLinecap="round"
               />
             </svg>
-            ホーム
+            ホームに戻る
           </Link>
         </div>
 

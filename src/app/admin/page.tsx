@@ -32,7 +32,7 @@ export default async function AdminPage() {
         </Link>
         <div className="home-top-actions">
           <Link href="/" className="home-btn">
-            ライブラリ
+            ← ホームに戻る
           </Link>
           <SignOutButton />
         </div>

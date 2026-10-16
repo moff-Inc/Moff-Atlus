@@ -71,5 +71,5 @@ export default async function GenerateContentPage({
       canEdit,
     };
   }
-  return <CanvasGenerator slug={meta.slug} initial={initial} />;
+  return <CanvasGenerator slug={meta.slug} initial={initial} defaultGroup={meta.grp} />;
 }

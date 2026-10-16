@@ -8,6 +8,9 @@ import { deleteGenerator } from "@/lib/identity/persist";
 import { downloadJson, toExchangeJson } from "@/lib/identity/exchange";
 import { GROUPS, isGroup, DEFAULT_GROUP } from "@/lib/identity/groups";
 import type { Params } from "@/lib/identity/types";
+import { GENERATE_CONTENTS } from "@/lib/identity/contents";
+
+const TEMPLATE_GROUPS = [...new Set(GENERATE_CONTENTS.map((c) => c.grp))].join(" / ");
 
 export interface GeneratorSummary {
   id: string;
@@ -98,7 +101,7 @@ export default function GeneratorList({
       <p className="home-empty">
         {searching
           ? "該当する制作物はありません。別の言葉や範囲で試してください。"
-          : "まだ制作物がありません。「テンプレ」から作成するか、JSON をインポートしてください。"}
+          : `まだ制作物がありません。テンプレート（${TEMPLATE_GROUPS} フォルダ）から作成するか、JSON をインポートしてください。`}
       </p>
     );
   }
