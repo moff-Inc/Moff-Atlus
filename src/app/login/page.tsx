@@ -77,7 +77,7 @@ function LoginForm() {
             <i />
             <i />
           </span>
-          SVG PROPERTY EDITOR
+          MOFF_ATLUS
         </div>
         <p className="auth-sub">ログインまたは新規登録してください</p>
 

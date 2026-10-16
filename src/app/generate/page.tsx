@@ -13,7 +13,7 @@ export default function GeneratePickerPage() {
             <i />
             <i />
           </span>
-          SVG PROPERTY EDITOR
+          MOFF_ATLUS
         </Link>
         <div className="home-top-actions">
           <SignOutButton />
