@@ -70,3 +70,42 @@ test("unknown mode falls back to the first mode", () => {
   const out = sanitizeParams("hex-liquid", { mode: "nope" })!;
   assert.equal(out.mode, HEX.modes[0].value);
 });
+
+test("positive-default numbers inside arrays cannot go negative", () => {
+  const circles = (GLASS.defaults.circles as Record<string, number>[]).map((c) => ({ ...c, r: -5 }));
+  const out = sanitizeParams("hex-liquid", { mode: "liquid-glass", circles })!;
+  for (const c of out.circles as Record<string, number>[]) assert.ok(c.r >= 0);
+});
+
+test("uncontrolled strings only accept default or preset values", () => {
+  for (const [slug, content] of Object.entries(MULTI_CONTENTS)) {
+    for (const mode of content.modes) {
+      const controlled = new Set(mode.controls.flatMap(([, cs]) => cs.map((c) => c[0])));
+      for (const [key, def] of Object.entries(mode.defaults)) {
+        if (controlled.has(key) || typeof def !== "string" || /^#[0-9a-f]{3,8}$/i.test(def)) continue;
+        const bad = sanitizeParams(slug, { mode: mode.value, [key]: "zz-unknown" })!;
+        assert.equal(Object.hasOwn(bad, key), false, `${slug}/${mode.value}.${key}`);
+        for (const p of mode.presets) {
+          if (typeof p[key] !== "string") continue;
+          const ok = sanitizeParams(slug, { mode: mode.value, [key]: p[key] })!;
+          assert.equal(ok[key], p[key]);
+        }
+      }
+    }
+  }
+});
+
+test("every mode's own defaults and presets survive sanitizing unchanged", () => {
+  for (const [slug, content] of Object.entries(MULTI_CONTENTS)) {
+    for (const mode of content.modes) {
+      for (const p of [mode.defaults, ...mode.presets]) {
+        const input: Record<string, unknown> = { ...mode.defaults, ...p, mode: mode.value };
+        const out = sanitizeParams(slug, input)!;
+        for (const k of Object.keys(input)) {
+          if (!(k in mode.defaults) && k !== "mode") continue;
+          assert.deepEqual(out[k], input[k], `${slug}/${mode.value}.${k}`);
+        }
+      }
+    }
+  }
+});

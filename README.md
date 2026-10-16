@@ -1,17 +1,28 @@
 # moff_Atlus
 
-SVGを読み込み、要素をクリックで選択してプロパティ（塗り／線／不透明度／変形／アニメーション）を編集し、**自動保存**するWebアプリ。
+部門ごとのフォルダ（HR / CD / DS / AX / ID）で制作物を共有・検索するチームライブラリ。
+テンプレート（ジェネレーター）で作った制作物を保存し、JSON で他のメンバーと受け渡しできる。
 
 - **Next.js 16 (App Router, TypeScript)** — Turbopack
-- **Supabase** — 認証・Postgres・Storage（すべてマルチユーザー、RLSで分離）
+- **Supabase** — 認証（Google OAuth のみ）・Postgres（RLS で権限を強制）
 - **Cloudflare Workers** — `@opennextjs/cloudflare` でデプロイ（配線済み）
 
 ## 仕組み（設計の要点）
 
-- **インポート時に各SVG要素へ安定ID `data-eid` を自動採番**（DOMPurifyでサニタイズ）。これが「動的プロパティの自動付与」の実体。
-- 保存は **二層**: 正規化した基底SVGを **Supabase Storage**（private + 署名URL）に、要素ごとの編集差分を **`documents.edits` (JSONB)** に。自動保存は小さなJSONのupsertのみで軽量。
-- 描画は基底SVGに差分を適用。エクスポートはDOMを直列化（`data-eid`除去＋アニメkeyframes埋込）。
-- SVGのparse/serializeは**クライアント限定**（Workersランタイムの制約回避）。
+- **ログインは @moff.jp の Google アカウントのみ。** 判定は DB の `public.is_member()` が正で、
+  Google identity（`auth.identities`）の email が moff.jp かつセッションが OAuth 由来（JWT `amr`）であることを見る。
+  middleware / `/auth/callback` / Auth Hook（`hook_before_user_created`）は UX と多重防御のための一次判定。
+- **共有ライブラリ:** `generators` はメンバー全員が閲覧可。更新・削除は作成者と管理者のみ（RLS）。
+  `user_id` と日時はクライアントから書き換え不可（列単位の grant）。他人の制作物を保存すると自分の複製になる。
+- **グループ:** `generators.grp`（HR / CD / DS / AX / ID、既定 CD）。ALL は全グループの横断表示で、保存先ではない。
+- **JSON 受け渡し:** 形式は `{ format: "moff-atlus/generator", version: 1, slug, name, grp, description, tags, params }`
+  （`src/lib/identity/exchange.ts`）。読み込み時は表示中のフォルダ（ALL なら JSON の grp）へ自分の制作物として保存する。
+- **他人の params は信頼しない:** DB・JSON 由来の params はレンダラへ渡す前に `sanitizeParams`
+  （`src/lib/identity/sanitize.ts`）でモード定義の defaults / controls / presets をホワイトリストに再構成する。
+- **あいまい検索:** RPC `search_generators(q, grp_filter)`。名前・説明・タグ・slug を NFKC＋小文字＋カタカナ→ひらがなで正規化し、
+  部分一致 → `pg_trgm` の `word_similarity ≥ 0.3` の順に並べる。範囲は全体 / 表示中のグループ。
+- **管理者:** `profiles.role = 'admin'`。初期管理者は `public.admin_bootstrap`（migration で `asai@moff.jp`）。
+  ロール変更は `/admin` → RPC `admin_set_role` のみ（最後の管理者は降格不可）。
 
 ## 必要環境
 
@@ -44,12 +55,15 @@ NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<supabase start が表示する PUBLISHABLE_KEY>
 ```
 
-> ローカルは `enable_confirmations=false`（`supabase/config.toml`）のため、メール確認なしでサインアップ即ログインできる。Studio: http://127.0.0.1:54323 / メール確認UI(Mailpit): http://127.0.0.1:54324
+> ログインには GCP の OAuth クライアントが必要（手順: [docs/google-auth-setup.md](docs/google-auth-setup.md)）。
+> `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` / `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` を export してから `npx supabase start` する。
+> Studio: http://127.0.0.1:54323
 
 ### DBスキーマ / 型
 
 - スキーマは `supabase/migrations/` にあり、`supabase start` / `supabase db reset` で適用。
 - 型再生成: `npx supabase gen types typescript --local > src/lib/types/database.types.ts`
+- テスト: `node --import jiti/register --test src/lib/identity/*.test.ts`
 
 ## Cloudflare Workers へのデプロイ
 
@@ -73,16 +87,17 @@ Supabase は本番プロジェクトのURL/publishableキーに差し替える�
 
 ```
 src/
-  middleware.ts               # 認証保護（Supabaseセッション更新, getClaims）
+  middleware.ts               # 認証保護（Supabaseセッション更新, getClaims → isMemberClaims）
   app/
-    page.tsx                  # ダッシュボード（文書一覧＋アップロード）
-    login/page.tsx            # ログイン/新規登録
-    auth/callback/route.ts    # コード交換コールバック
-    editor/[id]/page.tsx      # エディタ（基底SVGをStorageから取得）
-  components/                 # SvgCanvas / PropertyPanel / EditorClient / ...
+    page.tsx                  # ライブラリ（フォルダ・検索・JSONインポート）
+    admin/page.tsx            # 管理者: ユーザーとロール
+    login/page.tsx            # Google ログイン
+    auth/callback/route.ts    # コード交換 + ドメイン判定
+    generate/                 # テンプレート一覧 / ジェネレーター
+  components/                 # GeneratorList / SearchBar / ImportButton / AdminUsers / generate/*
   lib/
+    auth/member.ts            # moff.jp 判定（UX 用の一次判定）
+    identity/                 # レンダラ, sanitize, exchange(JSON), groups, persist
     supabase/{client,server,middleware}.ts   # @supabase/ssr
-    svg/{normalize,apply,serialize,animations}.ts
-    hooks/useAutoSave.ts
-supabase/migrations/          # documents テーブル + RLS + Storageポリシー
+supabase/migrations/          # generators / profiles / RLS / 検索 RPC / Auth Hook
 ```

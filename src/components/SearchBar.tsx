@@ -20,6 +20,15 @@ export default function SearchBar({
   const [range, setRange] = useState<"all" | "group">(scope);
   const first = useRef(true);
 
+  // ロゴ・フォルダ等で URL が外から変わったら入力欄を URL に合わせる
+  // （自分の入力で URL が変わった場合は text と一致するので上書きしない）
+  const [synced, setSynced] = useState({ q, scope });
+  if (synced.q !== q || synced.scope !== scope) {
+    setSynced({ q, scope });
+    if (q !== text.trim()) setText(q);
+    setRange(scope);
+  }
+
   useEffect(() => {
     if (first.current) {
       first.current = false;

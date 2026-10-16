@@ -15,7 +15,12 @@ export async function GET(request: Request) {
       ? nextRaw
       : "/";
 
-  if (!code) return NextResponse.redirect(`${origin}/login?error=auth`);
+  if (!code) {
+    // Auth Hook（hook_before_user_created）が登録を拒否した場合は error_description に理由が入る
+    const desc = searchParams.get("error_description") ?? "";
+    const reason = desc.includes("moff.jp") ? "domain" : "auth";
+    return NextResponse.redirect(`${origin}/login?error=${reason}`);
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.exchangeCodeForSession(code);

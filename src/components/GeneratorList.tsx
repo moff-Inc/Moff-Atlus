@@ -30,6 +30,12 @@ export default function GeneratorList({
 }) {
   const router = useRouter();
   const [list, setList] = useState<GeneratorSummary[]>(items);
+  // router.refresh() 後のサーバ側の一覧（移動・削除の反映）に追従する
+  const [source, setSource] = useState(items);
+  if (source !== items) {
+    setSource(items);
+    setList(items);
+  }
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 

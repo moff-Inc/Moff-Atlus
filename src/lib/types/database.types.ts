@@ -37,6 +37,20 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"documents": {
+                  Row: {
+                    "created_at": string,"edits": NonNullable<Json>,"id": string,"name": string,"storage_path": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"edits"?: NonNullable<Json>,"id"?: string,"name": string,"storage_path": string,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"edits"?: NonNullable<Json>,"id"?: string,"name"?: string,"storage_path"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"generators": {
                   Row: {
                     "created_at": string,"description": string,"grp": string,"id": string,"name": string,"params": NonNullable<Json>,"slug": string,"tags": (string)[],"updated_at": string,"user_id": string

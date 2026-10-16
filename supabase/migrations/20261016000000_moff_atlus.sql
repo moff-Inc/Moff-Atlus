@@ -1,33 +1,32 @@
--- moff_Atlus: SVGエディタ撤去 / moff.jp 限定 / 部門グループ / 共有ライブラリ / 管理者 / あいまい検索
+-- moff_Atlus: SVGエディタ撤去（データは保持） / moff.jp 限定 / 部門グループ / 共有ライブラリ / 管理者 / あいまい検索
 
 -- ---------------------------------------------------------------
 -- 1. SVG エディタ撤去
---    storage.objects は SQL から直接削除できないため svgs バケットの実体は残し、
---    ポリシーを外してアクセス不能にする（不要なら Dashboard で空にして削除）。
--- ---------------------------------------------------------------
-drop table if exists public.documents;
-drop policy if exists "svgs_owner_read" on storage.objects;
-drop policy if exists "svgs_owner_insert" on storage.objects;
-drop policy if exists "svgs_owner_update" on storage.objects;
-drop policy if exists "svgs_owner_delete" on storage.objects;
-
+--    運用ルール（仕様.md 2.5「マイグレーションは追加系のみ」）に従い、documents テーブルと
+--    svgs バケットは削除しない。アプリからは参照しなくなるが既存データは残る（RLS は所有者のみのまま）。
 -- ---------------------------------------------------------------
 -- 2. メンバー判定（moff.jp の Google ログインのみ）
---    Google 連携済みでも、旧パスワード（同メールで事前登録されたもの）でのログインを
---    通さないよう「このセッションが OAuth 由来か」(amr) も必須にする。
+--    - ドメイン判定は JWT の email（ユーザーが変更要求できる）ではなく、Google が
+--      ログイン時に返した identity の email（auth.identities）で行う
+--    - 同メールで事前登録されたパスワード等でのログインを通さないよう
+--      「このセッションが OAuth 由来か」(amr) も必須にする
 -- ---------------------------------------------------------------
 create or replace function public.is_member()
 returns boolean
 language sql stable
+security definer
 set search_path = ''
 as $$
-  select coalesce(
-    right(lower(auth.jwt() ->> 'email'), 8) = '@moff.jp'
-    and coalesce(auth.jwt() -> 'app_metadata' -> 'providers', '[]'::jsonb) ? 'google'
-    and coalesce(auth.jwt() -> 'amr', '[]'::jsonb) @> '[{"method": "oauth"}]'::jsonb,
-    false
-  );
+  select coalesce(auth.jwt() -> 'amr', '[]'::jsonb) @> '[{"method": "oauth"}]'::jsonb
+    and exists (
+      select 1 from auth.identities i
+      where i.user_id = auth.uid()
+        and i.provider = 'google'
+        and right(lower(i.identity_data ->> 'email'), 8) = '@moff.jp'
+    );
 $$;
+revoke execute on function public.is_member() from public, anon;
+grant execute on function public.is_member() to authenticated;
 
 -- Auth Hook: moff.jp 以外のユーザー作成を拒否（config.toml [auth.hook.before_user_created]）
 create or replace function public.hook_before_user_created(event jsonb)
@@ -121,7 +120,7 @@ alter table public.profiles enable row level security;
 revoke all on table public.profiles from anon, authenticated;
 grant select on table public.profiles to authenticated;
 create policy "profiles_member_select" on public.profiles for select to authenticated
-  using (public.is_member());
+  using ((select public.is_member()));
 
 -- ロール変更は管理者のみ・RPC 経由のみ（直接 update は grant なし）。最後の管理者は降格不可。
 create or replace function public.admin_set_role(target uuid, new_role text)
@@ -131,14 +130,14 @@ security definer
 set search_path = ''
 as $$
 begin
+  -- 同時降格で管理者 0 人になる競合を防ぐ（権限判定もロック取得後に行う）
+  lock table public.profiles in share row exclusive mode;
   if not public.is_admin() then
     raise exception 'forbidden' using errcode = '42501';
   end if;
   if new_role not in ('member', 'admin') then
     raise exception 'invalid role' using errcode = '22023';
   end if;
-  -- 同時降格で管理者 0 人になる競合を防ぐ
-  lock table public.profiles in share row exclusive mode;
   if new_role = 'member'
      and (select role from public.profiles where id = target) = 'admin'
      and (select count(*) from public.profiles where role = 'admin') <= 1 then
@@ -176,17 +175,19 @@ drop policy if exists "gen_own_update" on public.generators;
 drop policy if exists "gen_own_delete" on public.generators;
 
 create policy "gen_member_select" on public.generators for select to authenticated
-  using (public.is_member());
+  using ((select public.is_member()));
 create policy "gen_member_insert" on public.generators for insert to authenticated
-  with check (public.is_member() and (select auth.uid()) = user_id);
+  with check ((select public.is_member()) and (select auth.uid()) = user_id);
 create policy "gen_owner_update" on public.generators for update to authenticated
-  using (public.is_member() and ((select auth.uid()) = user_id or public.is_admin()))
-  with check (public.is_member() and ((select auth.uid()) = user_id or public.is_admin()));
+  using ((select public.is_member()) and ((select auth.uid()) = user_id or (select public.is_admin())))
+  with check ((select public.is_member()) and ((select auth.uid()) = user_id or (select public.is_admin())));
 create policy "gen_owner_delete" on public.generators for delete to authenticated
-  using (public.is_member() and ((select auth.uid()) = user_id or public.is_admin()));
+  using ((select public.is_member()) and ((select auth.uid()) = user_id or (select public.is_admin())));
 
--- 所有者(user_id)と作成日時は書き換え不可: update は列単位で許可
-revoke update on table public.generators from authenticated;
+-- 所有者(user_id)・日時は書き換え不可: insert / update は列単位で許可
+-- （created_at / updated_at を偽装して一覧・検索の先頭に固定されるのを防ぐ）
+revoke insert, update on table public.generators from authenticated;
+grant insert (user_id, slug, name, params, grp, description, tags) on table public.generators to authenticated;
 grant update (slug, name, params, grp, description, tags) on table public.generators to authenticated;
 
 -- ---------------------------------------------------------------

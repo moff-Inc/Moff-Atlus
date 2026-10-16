@@ -47,7 +47,9 @@ export async function updateSession(request: NextRequest) {
   if (!isAuthed && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
+    // 元のクエリ（?group= 等）は redirect に含め、/login 側には持ち越さない
+    url.search = "";
+    url.searchParams.set("redirect", pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 

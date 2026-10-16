@@ -24,9 +24,14 @@ export default async function DashboardPage({
   const email = claimsData?.claims.email as string | undefined;
   const me = claimsData?.claims.sub as string | undefined;
 
-  const [{ data: isAdmin }, { data: grpRows }, { data: profiles }, listRes] = await Promise.all([
+  // 件数は head + count で数える（行取得だと PostgREST の max_rows で頭打ちになる）
+  const countOf = (g: Group | null) => {
+    const base = supabase.from("generators").select("id", { count: "exact", head: true });
+    return (g ? base.eq("grp", g) : base).then((r) => r.count ?? 0);
+  };
+  const [{ data: isAdmin }, countList, { data: profiles }, listRes] = await Promise.all([
     supabase.rpc("is_admin"),
-    supabase.from("generators").select("grp"),
+    Promise.all([countOf(null), ...GROUPS.map((g) => countOf(g))]),
     supabase.from("profiles").select("id,email,display_name"),
     q
       ? supabase.rpc("search_generators", { q, grp_filter: scopeGroup ?? undefined })
@@ -35,9 +40,8 @@ export default async function DashboardPage({
         : supabase.from("generators").select(COLUMNS).order("updated_at", { ascending: false }),
   ]);
 
-  const counts = new Map<string, number>();
-  for (const r of grpRows ?? []) counts.set(r.grp, (counts.get(r.grp) ?? 0) + 1);
-  const total = grpRows?.length ?? 0;
+  const [total, ...groupCounts] = countList;
+  const counts = new Map<string, number>(GROUPS.map((g, i) => [g, groupCounts[i]]));
 
   const authors = new Map((profiles ?? []).map((p) => [p.id, p.display_name || p.email]));
   const items: GeneratorSummary[] = (listRes.data ?? []).map((g) => ({
@@ -117,7 +121,7 @@ export default async function DashboardPage({
         </nav>
 
         <div className="home-content">
-          <SearchBar group={group} q={q} scope={sp.scope === "group" ? "group" : "all"} />
+          <SearchBar group={group} q={q} scope={scopeGroup ? "group" : "all"} />
           <section className="home-section">
             <div className="home-section-head">
               <div>

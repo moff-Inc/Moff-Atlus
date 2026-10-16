@@ -7,7 +7,9 @@ import type { CanvasMode, Control, ParamValue, Params } from "./types";
 // - 未知キーは捨てる（__proto__ 等もここで落ちる）
 // - 不正値は既定値に置換
 // - 数値はスライダー範囲へクランプ（巨大 count 等によるフリーズ防止）
-// - 文字列は色 or SVG/HTML 特殊文字を含まない短い文字列のみ
+// - 既定値が正の数値は 0 以上に制限（半径などが負だと canvas API が例外を投げる）
+// - コントロールの無い文字列は既定値・プリセット値（色なら任意の色）のみ
+//   （XYZ_PAL[p.pal] のような辞書キーに未知値が入るとレンダラが落ちる）
 
 const COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
 const SAFE_STR_RE = /^[^<>"'&`\\]{0,200}$/;
@@ -21,21 +23,27 @@ function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v));
 }
 
-function safeString(v: unknown): v is string {
-  return typeof v === "string" && (COLOR_RE.test(v) || SAFE_STR_RE.test(v));
+// 色の既定値には任意の色、それ以外は既知の値（既定値・プリセット値）のみ
+function allowedString(def: string, v: unknown, known: ReadonlySet<unknown>): v is string {
+  if (typeof v !== "string") return false;
+  if (COLOR_RE.test(def)) return COLOR_RE.test(v);
+  return v === def || (known.has(v) && SAFE_STR_RE.test(v));
 }
 
 // 既定値と同じ「形」の値だけ通す（配列は同じ長さ・要素は同じキーと型）
-function sameShape(def: unknown, v: unknown, depth = 0): unknown {
+function sameShape(def: unknown, v: unknown, known: ReadonlySet<unknown>, depth = 0): unknown {
   if (depth > 4) return undefined;
-  if (typeof def === "number") return finite(v) ? clamp(v, -NUM_LIMIT, NUM_LIMIT) : undefined;
-  if (typeof def === "string") return safeString(v) ? v : undefined;
+  if (typeof def === "number") {
+    if (!finite(v)) return undefined;
+    return clamp(v, def > 0 ? 0 : -NUM_LIMIT, NUM_LIMIT);
+  }
+  if (typeof def === "string") return allowedString(def, v, known) ? v : undefined;
   if (typeof def === "boolean") return typeof v === "boolean" ? v : undefined;
   if (Array.isArray(def)) {
     if (!Array.isArray(v) || v.length !== def.length) return undefined;
     const out: unknown[] = [];
     for (let i = 0; i < def.length; i++) {
-      const r = sameShape(def[i], v[i], depth + 1);
+      const r = sameShape(def[i], v[i], known, depth + 1);
       if (r === undefined) return undefined;
       out.push(r);
     }
@@ -45,7 +53,12 @@ function sameShape(def: unknown, v: unknown, depth = 0): unknown {
     if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
     const out: Record<string, unknown> = {};
     for (const k of Object.keys(def)) {
-      const r = sameShape((def as Record<string, unknown>)[k], (v as Record<string, unknown>)[k], depth + 1);
+      const r = sameShape(
+        (def as Record<string, unknown>)[k],
+        (v as Record<string, unknown>)[k],
+        known,
+        depth + 1,
+      );
       if (r === undefined) return undefined;
       out[k] = r;
     }
@@ -97,7 +110,8 @@ export function sanitizeParams(slug: string, raw: unknown): Params | null {
     if (!Object.hasOwn(src, key)) continue;
     const def = mode.defaults[key];
     const ctl = controls.get(key);
-    const v = ctl ? byControl(ctl, src[key], def) : sameShape(def, src[key]);
+    const known = new Set(mode.presets.map((p) => p[key]));
+    const v = ctl ? byControl(ctl, src[key], def) : sameShape(def, src[key], known);
     if (v !== undefined) out[key] = v as ParamValue;
   }
   out.mode = mode.value;

@@ -51,3 +51,6 @@ next-env.d.ts
 # ローカルDBのデータバックアップ（ユーザーデータ。コミットしない）
 supabase/backup*.sql
 ios/MoodMetrix/.build/
+
+# Google OAuth の Client ID / Secret（setup.sh が読み込む）
+.secrets.google
