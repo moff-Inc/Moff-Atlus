@@ -15,7 +15,7 @@ export default function LoginPage() {
 }
 
 const ERRORS: Record<string, string> = {
-  domain: `@${ALLOWED_DOMAIN} の Google アカウントでログインしてください`,
+  domain: `@${ALLOWED_DOMAIN} 以外のアカウントではログインできません。別の Google アカウントを選んでください`,
   auth: "ログインに失敗しました。もう一度お試しください",
 };
 

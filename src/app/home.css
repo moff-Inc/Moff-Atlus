@@ -17,8 +17,8 @@
 }
 .home *,
 .auth * { box-sizing: border-box; }
-.home button, .home input, .home select,
-.auth button, .auth input, .auth select { font: inherit; }
+/* :where で詳細度 0 にし、.home-btn 等の font-size 指定を優先させる */
+:where(.home, .auth) :where(button, input, select, textarea) { font: inherit; }
 
 .home {
   min-height: 100svh;
@@ -190,6 +190,8 @@ a.home-card:hover .home-card-cta { color: var(--accent); }
   .home-topbar { padding: 0 14px; }
   .home-brand { font-size: 11px; letter-spacing: 0.08em; }
   .home-email { display: none; }
+  .home-top-actions { overflow-x: auto; scrollbar-width: none; }
+  .home-top-actions > * { flex-shrink: 0; }
   .home-main { padding: 28px 16px 48px; }
 }
 

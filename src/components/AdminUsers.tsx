@@ -59,7 +59,7 @@ export default function AdminUsers({ me, users }: { me: string; users: AdminUser
             <tr key={u.id}>
               <td>
                 <div>{u.display_name || u.email}</div>
-                <div className="home-card-tag">{u.email}</div>
+                {u.display_name && <div className="home-card-tag">{u.email}</div>}
               </td>
               <td>{u.works}</td>
               <td>{u.role === "admin" ? "管理者" : "メンバー"}</td>
