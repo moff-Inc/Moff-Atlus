@@ -48,6 +48,7 @@ begin
 end;
 $$;
 revoke execute on function public.hook_before_user_created(jsonb) from public, anon, authenticated;
+grant usage on schema public to supabase_auth_admin;
 grant execute on function public.hook_before_user_created(jsonb) to supabase_auth_admin;
 
 -- ---------------------------------------------------------------
@@ -251,3 +252,7 @@ as $$
 $$;
 revoke execute on function public.search_generators(text, text) from public, anon;
 grant execute on function public.search_generators(text, text) to authenticated;
+-- search_generators（security invoker）から呼ぶため呼び出し側にも実行権限が必要。
+-- 「新しいテーブル/関数を自動公開しない」設定のプロジェクトでも動くよう明示する。
+revoke execute on function public.search_norm(text) from public, anon;
+grant execute on function public.search_norm(text) to authenticated;
