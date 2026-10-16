@@ -80,8 +80,24 @@ npm run preview
 npm run deploy
 ```
 
-本番の秘密は `.dev.vars`（ローカルpreview用）と `wrangler secret put`（本番）で設定する。
-Supabase は本番プロジェクトのURL/publishableキーに差し替える。
+### 本番環境
+
+| 項目 | 値 |
+|---|---|
+| アプリ | https://moff-atlus.moff-atlus.workers.dev |
+| Supabase | プロジェクト `jsphlaguthpilhdiakrm`（東京 / ap-northeast-1） |
+
+- **メンバーは URL を開いて @moff.jp の Google アカウントでログインするだけ**（環境構築は不要）。
+- DB 変更: `npx supabase db push`（`supabase link --project-ref jsphlaguthpilhdiakrm` 済みであること）
+- Auth 設定: `supabase/config.toml` の `[remotes.production]` を編集し、
+  `source .secrets.google && npx supabase config diff` で確認 → `npx supabase config push`
+- デプロイ（`NEXT_PUBLIC_*` はビルド時に埋め込まれるため、本番の値を環境変数で渡す）:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://jsphlaguthpilhdiakrm.supabase.co \
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<Dashboard → Settings → API Keys の publishable key> \
+npm run deploy
+```
 
 ## 主要ディレクトリ
 

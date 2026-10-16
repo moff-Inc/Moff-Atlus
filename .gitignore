@@ -54,3 +54,6 @@ ios/MoodMetrix/.build/
 
 # Google OAuth の Client ID / Secret（setup.sh が読み込む）
 .secrets.google
+
+# Supabase Cloud の DB パスワード等
+.secrets.supabase

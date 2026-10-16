@@ -428,3 +428,44 @@ enabled = true
 # declarative_schema_path = "./schemas"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# ---------------------------------------------------------------
+# 本番（Supabase Cloud / 東京）向けの上書き。`supabase config push` で反映する。
+# 上書きしない項目（Email 無効化・Auth Hook など）は上の共通設定がそのまま使われる。
+# ---------------------------------------------------------------
+[remotes.production]
+project_id = "jsphlaguthpilhdiakrm"
+
+[remotes.production.auth]
+site_url = "https://moff-atlus.moff-atlus.workers.dev"
+# 本番 URL と、クラウドに接続してローカル開発する場合の localhost
+additional_redirect_urls = [
+  "https://moff-atlus.moff-atlus.workers.dev/**",
+  "http://localhost:3000/**",
+  "http://localhost:8787/**",
+]
+
+[remotes.production.auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+# ローカル専用だった nonce チェックのスキップを本番では行わない
+skip_nonce_check = false
+
+# 以下はローカル開発用の緩い値を本番へ持ち込まないための上書き（クラウドの既定値を維持）
+[remotes.production.auth.email]
+enable_confirmations = true
+max_frequency = "1m0s"
+otp_length = 8
+
+[remotes.production.auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[remotes.production.db.pooler]
+default_pool_size = 15
+max_client_conn = 200
+
+[remotes.production.storage.analytics]
+enabled = true
+max_namespaces = 10
