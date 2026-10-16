@@ -41,7 +41,7 @@ export default function GeneratePickerPage() {
                   <div className="home-card-title">{c.title}</div>
                   <p className="home-card-desc">{c.blurb}</p>
                 </div>
-                <span className="home-card-cta">SVG / MP4 / PNG で書き出し →</span>
+                <span className="home-card-cta">SVG / MP4 / PNG / JSON で書き出し →</span>
               </Link>
             ))}
           </div>

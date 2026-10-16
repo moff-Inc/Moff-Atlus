@@ -12,13 +12,20 @@ import {
   type VideoFormat,
 } from "@/lib/identity/exportCanvasVideo";
 import { saveGenerator } from "@/lib/identity/persist";
+import { sanitizeParams } from "@/lib/identity/sanitize";
+import { cleanTags, downloadJson, toExchangeJson } from "@/lib/identity/exchange";
+import { DEFAULT_GROUP, GROUPS, isGroup, type Group } from "@/lib/identity/groups";
 import { downloadSvg } from "@/lib/svg/serialize";
 import "./orbitype.css";
 
 export interface GenInitial {
   id: string;
   name: string;
-  params: Params; // 保存された params（mode を含む）
+  params: Params; // 保存された params（mode を含む）。未検証のため sanitizeParams を通して使う
+  grp: Group;
+  description: string;
+  tags: string[];
+  canEdit: boolean; // false（他人の制作物）なら保存は自分の複製として新規作成
 }
 
 const EXPORT_W = 1280;
@@ -75,7 +82,9 @@ function CanvasGeneratorInner({ slug, initial }: { slug: string; initial?: GenIn
 
   // 保存済みの mode が現存しない（削除されたモード等）場合は先頭モードへ正規化する。
   // 正規化せずに mode state へ残すと、書き出しファイル名や再保存に旧モード名が混入する。
-  const savedMode = typeof initial?.params?.mode === "string" ? initial.params.mode : null;
+  // 他人の制作物も読み込むため、レンダラへ渡す前にホワイトリスト検証する
+  const [safeInitial] = useState(() => (initial ? sanitizeParams(slug, initial.params) : null));
+  const savedMode = typeof safeInitial?.mode === "string" ? safeInitial.mode : null;
   const baseMode = content.modes.find((m) => m.value === savedMode) ?? content.modes[0];
   const initialMode = baseMode.value;
 
@@ -86,7 +95,7 @@ function CanvasGeneratorInner({ slug, initial }: { slug: string; initial?: GenIn
   const activeHasIntro = useMemo(() => !!active.create().renderIntro, [active]);
 
   const [params, setParams] = useState<Params>(() => {
-    const init: Params = initial?.params ? { ...initial.params } : {};
+    const init: Params = safeInitial ? { ...safeInitial } : {};
     delete (init as Record<string, unknown>).mode;
     // 正規化が起きたときだけ、旧モードの残骸キーを捨てる（通常のレコードは素通し）
     if (savedMode !== null && savedMode !== initialMode) {
@@ -96,7 +105,10 @@ function CanvasGeneratorInner({ slug, initial }: { slug: string; initial?: GenIn
   });
   const modeParamsRef = useRef<Record<string, Params>>({});
   const [name, setName] = useState(initial?.name ?? content.title);
-  const [genId, setGenId] = useState<string | null>(initial?.id ?? null);
+  const [genId, setGenId] = useState<string | null>(initial?.canEdit ? initial.id : null);
+  const [grp, setGrp] = useState<Group>(initial?.grp ?? DEFAULT_GROUP);
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [tagsText, setTagsText] = useState((initial?.tags ?? []).join(", "));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   // アクセシビリティ: 「視差効果を減らす」設定では自動再生しない（手動再生は可）。
@@ -257,7 +269,10 @@ function CanvasGeneratorInner({ slug, initial }: { slug: string; initial?: GenIn
       const id = await saveGenerator({
         id: genId,
         slug,
-        name: name.trim() || content.title,
+        name: name.trim().slice(0, 200) || content.title,
+        grp,
+        description: description.slice(0, 1000),
+        tags: cleanTags(tagsText.split(/[,、\s]+/)),
         // mode は最後に置く（同名パラメータがあってもモード名が消えないように）
         params: { ...params, mode },
       });
@@ -268,6 +283,20 @@ function CanvasGeneratorInner({ slug, initial }: { slug: string; initial?: GenIn
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleJson() {
+    downloadJson(
+      name.trim() || content.title,
+      toExchangeJson({
+        slug,
+        name: name.trim().slice(0, 200) || content.title,
+        grp,
+        description: description.slice(0, 1000),
+        tags: cleanTags(tagsText.split(/[,、\s]+/)),
+        params: { ...params, mode },
+      }),
+    );
   }
 
   async function handleVideo() {
@@ -403,8 +432,31 @@ function CanvasGeneratorInner({ slug, initial }: { slug: string; initial?: GenIn
             }}
             placeholder="名前"
           />
-          <button className="gen-tbtn" onClick={handleSave} disabled={saving}>
-            {saving ? "…" : saved ? "SAVED" : "SAVE"}
+          <select
+            className="gen-tbtn"
+            aria-label="保存先グループ"
+            value={grp}
+            onChange={(e) => {
+              if (isGroup(e.target.value)) setGrp(e.target.value);
+              setSaved(false);
+            }}
+          >
+            {GROUPS.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
+          <button
+            className="gen-tbtn"
+            onClick={handleSave}
+            disabled={saving}
+            title={genId ? undefined : initial && !initial.canEdit ? "他の人の制作物は自分の複製として保存されます" : undefined}
+          >
+            {saving ? "…" : saved ? "SAVED" : genId || !initial ? "SAVE" : "SAVE COPY"}
+          </button>
+          <button className="gen-tbtn" onClick={handleJson}>
+            JSON
           </button>
           <button className="gen-tbtn" onClick={handleSvg}>
             SVG
@@ -623,6 +675,37 @@ function CanvasGeneratorInner({ slug, initial }: { slug: string; initial?: GenIn
                 アルファ付きのまま開けます。重い場合はループ長と FPS を下げてください。
               </p>
             )}
+          </div>
+
+          <div className="gen-section">
+            <div className="gen-section-title">
+              <h2>情報 / INFO</h2>
+            </div>
+            <label className="gen-field gen-field-stack">
+              <span>説明</span>
+              <textarea
+                className="gen-number gen-text"
+                value={description}
+                maxLength={1000}
+                rows={3}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  setSaved(false);
+                }}
+              />
+            </label>
+            <label className="gen-field gen-field-stack">
+              <span>タグ（カンマ区切り）</span>
+              <input
+                className="gen-number gen-text"
+                value={tagsText}
+                maxLength={900}
+                onChange={(e) => {
+                  setTagsText(e.target.value);
+                  setSaved(false);
+                }}
+              />
+            </label>
           </div>
 
           <ControlsPanel spec={active.controls} params={params} defaults={active.defaults} onChange={applyPatch} />

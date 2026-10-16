@@ -1,13 +1,18 @@
 import { createClient } from "@/lib/supabase/client";
 import type { Json } from "@/lib/types/database.types";
+import type { Group } from "./groups";
 import type { Params } from "./types";
 
 // canvas ジェネレータの設定(params)を Supabase に保存/更新する（ブラウザ・RLS）。
+// id があれば更新（自分 or 管理者のみ RLS で許可）、無ければ自分の制作物として新規作成。
 // 返り値は保存レコードの id。
 export async function saveGenerator(opts: {
   id?: string | null;
   slug: string;
   name: string;
+  grp: Group;
+  description?: string;
+  tags?: string[];
   params: Params;
 }): Promise<string> {
   const supabase = createClient();
@@ -15,18 +20,28 @@ export async function saveGenerator(opts: {
   const uid = claims?.claims.sub;
   if (!uid) throw new Error("未認証です");
 
-  const params = opts.params as unknown as Json;
+  const fields = {
+    slug: opts.slug,
+    name: opts.name,
+    grp: opts.grp,
+    description: opts.description ?? "",
+    tags: opts.tags ?? [],
+    params: opts.params as unknown as NonNullable<Json>,
+  };
   if (opts.id) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("generators")
-      .update({ name: opts.name, params, slug: opts.slug })
-      .eq("id", opts.id);
+      .update(fields)
+      .eq("id", opts.id)
+      .select("id");
     if (error) throw error;
+    // RLS で弾かれた更新はエラーにならず 0 行になる
+    if (!data?.length) throw new Error("この制作物を更新する権限がありません");
     return opts.id;
   }
   const { data, error } = await supabase
     .from("generators")
-    .insert({ user_id: uid, slug: opts.slug, name: opts.name, params })
+    .insert({ user_id: uid, ...fields })
     .select("id")
     .single();
   if (error) throw error;
@@ -35,6 +50,7 @@ export async function saveGenerator(opts: {
 
 export async function deleteGenerator(id: string): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from("generators").delete().eq("id", id);
+  const { data, error } = await supabase.from("generators").delete().eq("id", id).select("id");
   if (error) throw error;
+  if (!data?.length) throw new Error("この制作物を削除する権限がありません");
 }
