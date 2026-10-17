@@ -32,6 +32,18 @@ fi
 say "依存パッケージをインストール"
 [ -d node_modules ] || npm install
 
+# Google OAuth（唯一のログイン手段）の Client ID / Secret。gitignore 済みの .secrets.google から読む。
+# 未作成でも起動はできるようプレースホルダを入れる（その場合ログインは不可。docs/google-auth-setup.md 参照）。
+if [ -f .secrets.google ]; then
+  # shellcheck disable=SC1091
+  . ./.secrets.google
+fi
+if [ -z "${SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID:-}" ] || [ -z "${SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET:-}" ]; then
+  echo "⚠ .secrets.google が無いため Google ログインは使えません（docs/google-auth-setup.md の手順2）"
+  export SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID="${SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID:-unset}"
+  export SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET="${SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET:-unset}"
+fi
+
 say "ローカル Supabase を起動（初回はイメージ取得で数分）"
 npx --yes supabase start >/dev/null 2>&1 || npx --yes supabase start || true
 

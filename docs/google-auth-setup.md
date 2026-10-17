@@ -1,8 +1,15 @@
 # Google ログイン セットアップ手順
 
-アプリ側の実装（ログイン画面の「Googleでログイン」ボタン、`/auth/callback`、
-`supabase/config.toml` の `[auth.external.google]`）は導入済み。あとは **GCP で
-OAuth クライアントを申請** し、**Client ID / Secret を Supabase に渡す** だけで動く。
+**ログイン手段は Google のみ**（メール/パスワードは無効）で、**@moff.jp のアカウントだけ**が使える。
+アプリ側の実装（ログイン画面、`/auth/callback`、`supabase/config.toml` の `[auth.external.google]` と
+`[auth.hook.before_user_created]`）は導入済み。あとは **GCP で OAuth クライアントを申請** し、
+**Client ID / Secret を Supabase に渡す** だけで動く。
+
+moff.jp 以外を弾く仕組み（多重）:
+- ログイン画面が Google に `hd=moff.jp` を渡す（アカウント選択のヒント。強制力はない）
+- Auth Hook `public.hook_before_user_created` が moff.jp 以外のユーザー作成を拒否
+- `/auth/callback` と middleware がドメイン外のセッションを破棄
+- **DB の RLS（`public.is_member()`）が最終判定**: Google identity の email が moff.jp かつセッションが OAuth 由来であること
 
 ## 認証の流れ（誰がどこへ飛ぶか）
 
@@ -28,7 +35,8 @@ OAuth クライアントを申請** し、**Client ID / Secret を Supabase に�
 
 1. https://console.cloud.google.com/ でプロジェクトを作成/選択。
 2. **APIs & Services → OAuth consent screen**（新UIでは「Google Auth Platform」）
-   - **User Type**: 社外の Google アカウントも使うなら **External**／Google Workspace 内限定なら Internal。
+   - **User Type**: **Internal を推奨**（moff.jp の Google Workspace アカウントだけが同意画面を通れる。
+     Google 側で組織外アカウントを確実に弾ける）。External にする場合もアプリ側で moff.jp 以外は拒否される。
    - アプリ名・ユーザーサポートメール・デベロッパー連絡先を入力。
    - **スコープ**: 追加不要（`email` / `profile` / `openid` の既定のみ）。→ 機微スコープを使わないので **Google の審査(verification)は原則不要**。
    - External のままだと「テスト中」状態。**自分たちだけで試すなら「テストユーザー」に使うGoogleアカウントを追加**。一般公開するなら「アプリを公開(PUBLISH)」。
@@ -91,6 +99,9 @@ npm run preview          # http://localhost:8787
 本番Workerはローカル(127.0.0.1)のSupabaseに到達できないため、**本番はホスト版
 Supabaseプロジェクトが前提**。
 
+0. ホスト版 Supabase に migration を適用（`supabase db push` 等）し、Dashboard → **Authentication → Providers → Email** を
+   **無効化**、**Authentication → Hooks → Before User Created** に Postgres 関数 `public.hook_before_user_created` を設定する
+   （config.toml の設定はローカル専用で、ホスト版には反映されない）。
 1. ホスト版 Supabase Dashboard → **Authentication → Providers → Google** を有効化し、
    手順1の **Client ID / Secret** を入力して保存。
    - この画面に表示される callback（`https://<PROJECT_REF>.supabase.co/auth/v1/callback`）を、
@@ -109,3 +120,13 @@ Supabaseプロジェクトが前提**。
 | OAuth Client ID / Secret | GCP Console（Credentials） | ローカル=env / 本番=Supabase Dashboard |
 | Supabase callback URL | 固定（ローカル127.0.0.1:54321 / 本番は各プロジェクト） | GCP の Authorized redirect URIs |
 | アプリの redirect 許可 | 設定値 | config.toml（済） / 本番はDashboard |
+
+---
+
+## 補足: 既存アカウント・退職者の扱い
+
+- 以前メール/パスワードで登録した @moff.jp ユーザーは、同じメールで初めて Google ログインした時点で
+  Supabase が Google identity を連携し、そのまま（制作物・ロールを引き継いで）使える。
+  連携前のパスワードではログインできない（Email プロバイダ無効 + RLS が OAuth セッションを要求）。
+- 退職者などのアクセス停止は Supabase Dashboard → Authentication → Users でユーザーを削除する。
+  Google 側でアカウントを停止しても、発行済みセッションはリフレッシュトークンで延命されるため。

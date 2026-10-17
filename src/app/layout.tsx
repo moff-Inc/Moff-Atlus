@@ -25,7 +25,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "SVG Property Editor",
+  title: "moff_Atlus",
   description: "SVGを読み込み、要素のプロパティを編集して自動保存するエディタ",
 };
 

@@ -17,8 +17,8 @@
 }
 .home *,
 .auth * { box-sizing: border-box; }
-.home button, .home input, .home select,
-.auth button, .auth input, .auth select { font: inherit; }
+/* :where で詳細度 0 にし、.home-btn 等の font-size 指定を優先させる */
+:where(.home, .auth) :where(button, input, select, textarea) { font: inherit; }
 
 .home {
   min-height: 100svh;
@@ -151,10 +151,47 @@ a.home-card:hover .home-card-cta { color: var(--accent); }
 .home-empty { margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.7; letter-spacing: 0.04em; border: 1px dashed var(--line); padding: 30px; text-align: center; }
 .home-error { color: var(--danger); font-size: 9px; letter-spacing: 0.06em; }
 
+/* ---------- library: folders + search ---------- */
+.home-layout { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 32px; align-items: start; }
+.home-folders { position: sticky; top: 80px; display: flex; flex-direction: column; gap: 2px; }
+.home-folder { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border: 1px solid transparent; color: var(--muted); font-size: 10px; letter-spacing: 0.12em; text-decoration: none; transition: color 180ms ease, border-color 180ms ease; }
+.home-folder:hover { color: var(--ink); }
+.home-folder.is-active { color: var(--ink); border-color: var(--line); background: var(--panel); }
+.home-folder:focus-visible, .home-chip:focus-visible, .home-search-input:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+.home-content { min-width: 0; }
+.home-search { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
+.home-search-input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 11px 12px; font-size: 11px; letter-spacing: 0.03em; }
+.home-search-input::placeholder { color: var(--muted); }
+.home-search-input:focus { outline: none; border-color: rgba(241, 242, 233, 0.4); }
+.home-search-scope { display: flex; gap: 4px; flex-shrink: 0; }
+.home-chip { border: 1px solid var(--line); background: transparent; color: var(--muted); padding: 9px 12px; font-size: 9px; letter-spacing: 0.08em; cursor: pointer; white-space: nowrap; }
+.home-chip.is-active { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+.home-chip:disabled { opacity: 0.4; cursor: default; }
+.home-card-tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; color: var(--muted); font-size: 8px; letter-spacing: 0.06em; }
+.home-card-actions { display: inline-flex; align-items: center; gap: 12px; }
+.home-card-move { border: 1px solid var(--line); background: var(--paper); color: var(--muted); font-size: 8px; padding: 2px 4px; }
+.home-act:hover { color: var(--accent); }
+
+/* ---------- admin ---------- */
+.home-table { width: 100%; margin-top: 18px; border-collapse: collapse; font-size: 10px; letter-spacing: 0.04em; }
+.home-table th { text-align: left; color: var(--muted); font-size: 8px; letter-spacing: 0.12em; font-weight: 400; padding: 0 12px 10px 0; border-bottom: 1px solid var(--line); }
+.home-table td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.home-table td:last-child { text-align: right; padding-right: 0; }
+
+@media (max-width: 760px) {
+  .home-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .home-folders { position: static; flex-direction: row; overflow-x: auto; }
+  .home-folder { flex-shrink: 0; }
+  .home-search { flex-wrap: wrap; }
+  .home-search-input { flex-basis: 100%; }
+}
+
 @media (max-width: 560px) {
   .home-topbar { padding: 0 14px; }
   .home-brand { font-size: 11px; letter-spacing: 0.08em; }
   .home-email { display: none; }
+  .home-top-actions { overflow-x: auto; scrollbar-width: none; }
+  .home-top-actions > * { flex-shrink: 0; }
   .home-main { padding: 28px 16px 48px; }
 }
 
@@ -173,3 +210,4 @@ a.home-card:hover .home-card-cta { color: var(--accent); }
 .auth-divider { display: flex; align-items: center; gap: 12px; margin: 18px 0 14px; color: var(--muted); font-size: 8px; letter-spacing: 0.14em; }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .auth-google { width: 100%; justify-content: center; padding: 11px 16px; }
+.auth-card > .auth-error { margin-bottom: 14px; }

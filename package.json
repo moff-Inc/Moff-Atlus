@@ -1,5 +1,5 @@
 {
-  "name": "svg-property-editor",
+  "name": "moff-atlus",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -17,20 +17,19 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
-    "dompurify": "^3.4.14",
     "mp4-muxer": "^5.2.2",
-    "next": "16.3.2",
+    "next": "^16.4.2",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^1.20.2",
+    "@opennextjs/cloudflare": "^1.20.12",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.2",
+    "eslint-config-next": "^16.4.2",
     "tailwindcss": "^4",
     "typescript": "^5",
     "wrangler": "^4.125.0"

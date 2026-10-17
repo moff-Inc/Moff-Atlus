@@ -432,3 +432,7 @@
   line-height: 1.8;
   color: var(--muted);
 }
+
+/* 制作物情報（説明・タグ） */
+.gen-field-stack { flex-direction: column; align-items: stretch; gap: 8px; }
+.gen-text { text-align: left; width: 100%; resize: vertical; font: inherit; font-size: 10px; letter-spacing: 0.02em; }

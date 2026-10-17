@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/types/database.types";
+import { isMemberClaims } from "@/lib/auth/member";
 
 // 公開（未認証で到達可）パス
 function isPublicPath(pathname: string): boolean {
@@ -37,7 +38,8 @@ export async function updateSession(request: NextRequest) {
 
   // 重要: createServerClient 直後に呼ぶ（トークン更新の要）。前後に処理を挟まない。
   const { data } = await supabase.auth.getClaims();
-  const isAuthed = Boolean(data?.claims);
+  // 許可ドメイン外のセッションは未認証扱い（/login 側で破棄する）
+  const isAuthed = isMemberClaims(data?.claims);
 
   const { pathname } = request.nextUrl;
 
@@ -45,7 +47,9 @@ export async function updateSession(request: NextRequest) {
   if (!isAuthed && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
+    // 元のクエリ（?group= 等）は redirect に含め、/login 側には持ち越さない
+    url.search = "";
+    url.searchParams.set("redirect", pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 

@@ -2,7 +2,7 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "svg-property-editor"
+project_id = "Moff-Atlus"
 
 [api]
 enabled = true
@@ -223,7 +223,8 @@ web3 = 30
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
-enable_signup = true
+# ログインは Google OAuth のみ（メール/パスワード登録は不可）
+enable_signup = false
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
@@ -281,9 +282,10 @@ max_frequency = "5s"
 # inactivity_timeout = "8h"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
-# [auth.hook.before_user_created]
-# enabled = true
-# uri = "pg-functions://postgres/auth/before-user-created-hook"
+# moff.jp の Google アカウント以外のユーザー作成を拒否（migration の public.hook_before_user_created）
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/public/hook_before_user_created"
 
 # This hook runs before a token is issued and allows you to add additional claims based on the authentication method used.
 # [auth.hook.custom_access_token]
@@ -426,3 +428,44 @@ enabled = true
 # declarative_schema_path = "./schemas"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# ---------------------------------------------------------------
+# 本番（Supabase Cloud / 東京）向けの上書き。`supabase config push` で反映する。
+# 上書きしない項目（Email 無効化・Auth Hook など）は上の共通設定がそのまま使われる。
+# ---------------------------------------------------------------
+[remotes.production]
+project_id = "jsphlaguthpilhdiakrm"
+
+[remotes.production.auth]
+site_url = "https://moff-atlus.moff-atlus.workers.dev"
+# 本番 URL と、クラウドに接続してローカル開発する場合の localhost
+additional_redirect_urls = [
+  "https://moff-atlus.moff-atlus.workers.dev/**",
+  "http://localhost:3000/**",
+  "http://localhost:8787/**",
+]
+
+[remotes.production.auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+# ローカル専用だった nonce チェックのスキップを本番では行わない
+skip_nonce_check = false
+
+# 以下はローカル開発用の緩い値を本番へ持ち込まないための上書き（クラウドの既定値を維持）
+[remotes.production.auth.email]
+enable_confirmations = true
+max_frequency = "1m0s"
+otp_length = 8
+
+[remotes.production.auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[remotes.production.db.pooler]
+default_pool_size = 15
+max_client_conn = 200
+
+[remotes.production.storage.analytics]
+enabled = true
+max_namespaces = 10
