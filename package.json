@@ -2,11 +2,17 @@
   "name": "svg-property-editor",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=26.12.1 <27"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "verify": "npm run lint && npm run typecheck && npm run build:cf",
+    "update:runtime": "node scripts/update-runtime.mjs && npm install --package-lock-only",
     "build:cf": "node --env-file-if-exists=.dev.vars ./node_modules/.bin/opennextjs-cloudflare build",
     "preview": "npm run build:cf && opennextjs-cloudflare preview",
     "deploy": "npm run build:cf && opennextjs-cloudflare deploy",
@@ -19,18 +25,18 @@
     "@supabase/supabase-js": "^2.112.4",
     "dompurify": "^3.4.14",
     "mp4-muxer": "^5.2.2",
-    "next": "16.3.2",
+    "next": "16.4.2",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.20.2",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "26.6.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.2",
+    "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
     "typescript": "^5",
     "wrangler": "^4.125.0"

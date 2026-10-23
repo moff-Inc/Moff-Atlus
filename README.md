@@ -15,8 +15,29 @@ SVGを読み込み、要素をクリックで選択してプロパティ（塗�
 
 ## 必要環境
 
-- Node.js 22+（開発は Node 26 で確認）
+- Node.js は `.node-version` に記載したバージョンを使用（開発・CI共通）。`package.json` の `engines.node` も同時に更新する。
 - Docker Desktop（ローカルSupabase用）
+
+## Node.js / Next.js の更新
+
+- GitHub Actions の `Update Node.js and Next.js` が毎日 07:23（日本時間）に最新安定版を確認する。GitHub側の混雑で開始が遅れることがある。
+- Node.js は公式配布一覧の最新安定版（Current、メジャー更新を含む）、Next.js は npm の `latest` を追跡する。`eslint-config-next` は Next.js と同一バージョン、`@types/node` は Node.js と同一メジャーに揃える。
+- 変更がある場合、`npm ci` → lint → 型チェック → Cloudflare向け本番ビルドが成功したコミットだけ更新PRを作成し、mainへsquash mergeする。失敗時や検証中にmainが変更された場合は自動マージしない。
+- 外部サービスや追加のトークンは不要。GitHub Actions のリポジトリ設定でPR作成を許可する必要がある。ブランチ保護ルールがある場合はそのルールも満たす必要がある。
+- この仕組みはリポジトリとCIを更新する。Mac本体のNode.js更新や、本番環境へのデプロイは行わない。pull後は手元のバージョン管理ツールで `.node-version` のバージョンをインストール・選択し、`npm ci` を実行する。
+- Supabaseの公開ダミー値でコンパイルを検証する。ログイン・DB接続など、本番サービスを使う動作テストは含まない。
+
+手動で確認・更新する場合:
+
+```bash
+node --version
+npm run update:runtime
+# .node-version が変わった場合は、先にそのNode.jsへ切り替える
+npm ci
+npm run verify
+```
+
+GitHub の Actions 画面から `Update Node.js and Next.js` → `Run workflow` でも実行できる。
 
 ## セットアップ（ローカル）
 
