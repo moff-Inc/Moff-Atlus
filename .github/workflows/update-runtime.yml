@@ -1,0 +1,78 @@
+name: Update Node.js and Next.js
+
+on:
+  schedule:
+    - cron: "23 22 * * *" # Daily at 07:23 JST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-runtime
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+      - name: Discover stable releases
+        run: node scripts/update-runtime.mjs
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm install --package-lock-only
+      - name: Detect updates
+        id: changes
+        run: |
+          if ! git diff --quiet -- package.json package-lock.json .node-version; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.changes.outputs.changed == 'true'
+        run: npm ci
+      # Validate in this run: bot-created PR workflows can require human approval.
+      - if: steps.changes.outputs.changed == 'true'
+        run: npm run verify
+      - name: Create and merge the verified update
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          base_sha="$(git rev-parse HEAD)"
+          branch="codex/runtime-update-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json .node-version
+          git commit -m 'chore: update Node.js and Next.js stable releases'
+          head_sha="$(git rev-parse HEAD)"
+          git push origin "$branch"
+          cat > "$RUNNER_TEMP/runtime-update.md" <<EOF
+          Update Node.js and Next.js to their latest stable releases, with matching ESLint and Node.js types.
+
+          Validation: npm ci and npm run verify (lint, TypeScript and Cloudflare production build) passed on this commit.
+
+          Workflow: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+          pr_url="$(gh pr create --base main --head "$branch" --title 'chore: update Node.js and Next.js' --body-file "$RUNNER_TEMP/runtime-update.md")"
+          # Never merge a build tested against an older main. Retry next day instead.
+          current_base="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          if [ "$current_base" != "$base_sha" ]; then
+            echo 'main changed during validation; leaving the PR open without merging.'
+            exit 1
+          fi
+          gh pr merge "$pr_url" --squash --match-head-commit "$head_sha" --delete-branch
